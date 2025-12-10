@@ -1,0 +1,5 @@
+{
+  "name": "Condomínio Fácil",
+  "description": "Plataforma completa para gestão de condomínios. App para síndicos e moradores com controle de acesso, boletos e reservas.",
+  "requestFramePermissions": []
+}
