@@ -3,9 +3,11 @@ import {
   Building2, Users, Smartphone, ArrowRight, CheckCircle2, 
   Menu, X, Lock, CreditCard, Calendar, MessageSquare, Camera, FileText,
   Package, Dog, Search, Video, Megaphone, Hammer, AlertTriangle, Star, 
-  Bell, ChevronRight, UserCircle, LogOut, Settings, Home, QrCode, Key
+  Bell, ChevronRight, UserCircle, LogOut, Settings, Home, QrCode, Key,
+  Loader2
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { sendDemoRequestEmail } from '../services/emailService';
 
 interface LandingProps {
   onLogin: () => void;
@@ -14,6 +16,72 @@ interface LandingProps {
 export const Landing: React.FC<LandingProps> = ({ onLogin }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(0);
+  
+  // Form state for demo request
+  const [formData, setFormData] = useState({
+    nome: '',
+    email: '',
+    condominio: '',
+    telefone: ''
+  });
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [showContactOptions, setShowContactOptions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setErrorMessage('');
+  };
+
+  const handleDemoRequest = () => {
+    const { nome, email } = formData;
+    
+    if (!nome || !email) {
+      setErrorMessage('Por favor, preencha pelo menos seu nome e email.');
+      return;
+    }
+
+    setShowContactOptions(true);
+  };
+
+  const sendViaWhatsApp = () => {
+    const { nome, email, condominio, telefone } = formData;
+    const message = encodeURIComponent(
+      `Olá! Gostaria de agendar uma demonstração do Condomínio Fácil.\n\n` +
+      `*Dados do contato:*\n` +
+      `Nome: ${nome}\n` +
+      `Email: ${email}\n` +
+      `Condomínio: ${condominio || 'Não informado'}\n` +
+      `Telefone: ${telefone || 'Não informado'}`
+    );
+    
+    window.open(`https://wa.me/5561996505995?text=${message}`, '_blank');
+    setFormSubmitted(true);
+    setShowContactOptions(false);
+    setFormData({ nome: '', email: '', condominio: '', telefone: '' });
+  };
+
+  const sendViaEmail = async () => {
+    setIsLoading(true);
+    setShowContactOptions(false);
+    
+    try {
+      const result = await sendDemoRequestEmail(formData);
+      
+      if (result.success) {
+        setFormSubmitted(true);
+        setFormData({ nome: '', email: '', condominio: '', telefone: '' });
+      } else {
+        setErrorMessage(result.message);
+      }
+    } catch (error) {
+      setErrorMessage('Erro ao enviar. Tente via WhatsApp.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Intersection Observer for Scroll Animations
   useEffect(() => {
@@ -604,19 +672,118 @@ export const Landing: React.FC<LandingProps> = ({ onLogin }) => {
           <p className="text-xl text-slate-600 mb-10 reveal" style={{ transitionDelay: '0.1s' }}>Junte-se a mais de 500 síndicos que modernizaram sua gestão com o Condomínio Fácil.</p>
           
           <div className="bg-white p-8 rounded-3xl border border-slate-200 inline-block w-full max-w-2xl shadow-xl shadow-blue-900/5 reveal" style={{ transitionDelay: '0.2s' }}>
-            <h3 className="font-bold text-lg mb-6">Solicite uma demonstração gratuita</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-               <input type="text" placeholder="Seu Nome" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" />
-               <input type="email" placeholder="Seu Email" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" />
-               <input type="text" placeholder="Nome do Condomínio" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" />
-               <input type="tel" placeholder="Telefone / WhatsApp" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" />
-            </div>
-            <Button size="lg" className="w-full mt-6 bg-gradient-to-r from-blue-900 to-blue-700 hover:from-blue-800 hover:to-blue-600 transform hover:scale-[1.02] transition-all shadow-lg" onClick={onLogin}>
-              Agendar Demonstração
-            </Button>
+            
+            {/* Success Message */}
+            {formSubmitted ? (
+              <div className="py-8">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="text-green-600" size={32} />
+                </div>
+                <h3 className="font-bold text-xl text-slate-900 mb-2">Solicitação Enviada!</h3>
+                <p className="text-slate-600 mb-6">Em breve nossa equipe entrará em contato com você.</p>
+                <Button variant="outline" onClick={() => setFormSubmitted(false)}>
+                  Enviar nova solicitação
+                </Button>
+              </div>
+            ) : isLoading ? (
+              <div className="py-12">
+                <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+                <p className="text-slate-600">Enviando sua solicitação...</p>
+              </div>
+            ) : (
+              <>
+                <h3 className="font-bold text-lg mb-6">Solicite uma demonstração gratuita</h3>
+                
+                {/* Mensagem de erro */}
+                {errorMessage && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm flex items-center gap-2">
+                    <AlertTriangle size={18} />
+                    {errorMessage}
+                  </div>
+                )}
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                   <input 
+                     type="text" 
+                     name="nome"
+                     placeholder="Seu Nome *" 
+                     value={formData.nome}
+                     onChange={handleInputChange}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" 
+                   />
+                   <input 
+                     type="email" 
+                     name="email"
+                     placeholder="Seu Email *" 
+                     value={formData.email}
+                     onChange={handleInputChange}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" 
+                   />
+                   <input 
+                     type="text" 
+                     name="condominio"
+                     placeholder="Nome do Condomínio" 
+                     value={formData.condominio}
+                     onChange={handleInputChange}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" 
+                   />
+                   <input 
+                     type="tel" 
+                     name="telefone"
+                     placeholder="Telefone / WhatsApp" 
+                     value={formData.telefone}
+                     onChange={handleInputChange}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" 
+                   />
+                </div>
+                <Button size="lg" className="w-full mt-6 bg-gradient-to-r from-blue-900 to-blue-700 hover:from-blue-800 hover:to-blue-600 transform hover:scale-[1.02] transition-all shadow-lg" onClick={handleDemoRequest}>
+                  Agendar Demonstração
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </section>
+
+      {/* Contact Options Modal */}
+      {showContactOptions && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-fade-in">
+            <div className="text-center mb-6">
+              <h3 className="font-bold text-xl text-slate-900 mb-2">Como prefere nos contatar?</h3>
+              <p className="text-slate-600 text-sm">Escolha a melhor forma de enviar sua solicitação</p>
+            </div>
+            
+            <div className="space-y-3">
+              <button 
+                onClick={sendViaWhatsApp}
+                className="w-full flex items-center justify-center gap-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-xl transition-all hover:scale-[1.02] shadow-lg"
+              >
+                <MessageSquare size={20} />
+                Enviar via WhatsApp
+              </button>
+              
+              <button 
+                onClick={sendViaEmail}
+                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all hover:scale-[1.02] shadow-lg"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="16" x="2" y="4" rx="2"/>
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                </svg>
+                Enviar via Email
+              </button>
+              
+              <button 
+                onClick={() => setShowContactOptions(false)}
+                className="w-full text-slate-500 hover:text-slate-700 font-medium py-3 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-slate-50 border-t border-slate-200 py-12">
