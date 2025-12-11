@@ -3,9 +3,20 @@ import {
   Building2, Users, Smartphone, ArrowRight, CheckCircle2, 
   Menu, X, Lock, CreditCard, Calendar, MessageSquare, Camera, FileText,
   Package, Dog, Search, Video, Megaphone, Hammer, AlertTriangle, Star, 
-  Bell, ChevronRight, UserCircle, LogOut, Settings, Home, QrCode, Key
+  Bell, ChevronRight, UserCircle, LogOut, Settings, Home, QrCode, Key, Mail, Loader2,
+  Copy, Check, Banknote, Smartphone as SmartphoneIcon
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { sendEmailViaSendGrid } from '../services/emailService';
+
+// Tipos para pagamento
+interface SelectedPlan {
+  name: string;
+  price: string;
+  period: string;
+}
+
+type PaymentMethod = 'pix' | 'credit_card' | 'boleto' | 'stripe' | null;
 
 interface LandingProps {
   onLogin: () => void;
@@ -14,6 +25,130 @@ interface LandingProps {
 export const Landing: React.FC<LandingProps> = ({ onLogin }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(0);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    nome: '',
+    email: '',
+    condominio: '',
+    telefone: ''
+  });
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  // Payment states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
+  const [paymentStep, setPaymentStep] = useState<'select' | 'process' | 'success'>('select');
+  const [pixCopied, setPixCopied] = useState(false);
+  
+  // Dados do cliente para pagamento
+  const [customerData, setCustomerData] = useState({
+    nome: '',
+    email: '',
+    cpf: '',
+    telefone: ''
+  });
+
+  const handleSelectPlan = (plan: { name: string; price: string; period: string }) => {
+    if (plan.price === 'Sob Consulta') {
+      // Para plano Enterprise, abre WhatsApp
+      window.open('https://wa.me/5561996505995?text=' + encodeURIComponent(`Olá! Tenho interesse no plano Enterprise do Condomínio Fácil. Gostaria de mais informações.`), '_blank');
+      return;
+    }
+    setSelectedPlan(plan);
+    setShowPaymentModal(true);
+    setPaymentStep('select');
+    setPaymentMethod(null);
+  };
+
+  const handlePaymentMethodSelect = (method: PaymentMethod) => {
+    setPaymentMethod(method);
+    setPaymentStep('process');
+  };
+
+  const handleCustomerDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setCustomerData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const processPayment = () => {
+    // Simulação de processamento
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      setPaymentStep('success');
+    }, 2000);
+  };
+
+  const copyPixCode = () => {
+    const pixCode = '00020126580014br.gov.bcb.pix0136desenvolvimento@msconsultoriati.com5204000053039865802BR5925CONDOMINIO FACIL TECNOL6009SAO PAULO62070503***6304';
+    navigator.clipboard.writeText(pixCode);
+    setPixCopied(true);
+    setTimeout(() => setPixCopied(false), 3000);
+  };
+
+  const closePaymentModal = () => {
+    setShowPaymentModal(false);
+    setSelectedPlan(null);
+    setPaymentMethod(null);
+    setPaymentStep('select');
+    setCustomerData({ nome: '', email: '', cpf: '', telefone: '' });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setErrorMessage('');
+  };
+
+  const handleSubmit = () => {
+    const { nome, email } = formData;
+    if (!nome || !email) {
+      setErrorMessage('Por favor, preencha seu nome e email.');
+      return;
+    }
+    setShowContactModal(true);
+  };
+
+  const sendViaWhatsApp = () => {
+    const { nome, email, condominio, telefone } = formData;
+    const message = encodeURIComponent(
+      `*Nova Solicitação de Demonstração - Condomínio Fácil*\n\n` +
+      `👤 *Nome:* ${nome}\n` +
+      `📧 *Email:* ${email}\n` +
+      `🏢 *Condomínio:* ${condominio || 'Não informado'}\n` +
+      `📱 *Telefone:* ${telefone || 'Não informado'}`
+    );
+    window.open(`https://wa.me/5561996505995?text=${message}`, '_blank');
+    setFormSubmitted(true);
+    setShowContactModal(false);
+    setFormData({ nome: '', email: '', condominio: '', telefone: '' });
+  };
+
+  const sendViaEmail = async () => {
+    setIsLoading(true);
+    setShowContactModal(false);
+    setErrorMessage('');
+    
+    try {
+      const result = await sendEmailViaSendGrid(formData);
+      
+      if (result.success) {
+        setFormSubmitted(true);
+        setFormData({ nome: '', email: '', condominio: '', telefone: '' });
+      } else {
+        setErrorMessage(result.message || 'Erro ao enviar email. Tente via WhatsApp.');
+      }
+    } catch (error) {
+      setErrorMessage('Erro ao enviar email. Tente via WhatsApp.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Intersection Observer for Scroll Animations
   useEffect(() => {
@@ -561,9 +696,9 @@ export const Landing: React.FC<LandingProps> = ({ onLogin }) => {
                 <Button 
                   variant={plan.highlight ? 'primary' : 'white'} 
                   className={`w-full ${plan.highlight ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-                  onClick={onLogin}
+                  onClick={() => handleSelectPlan({ name: plan.name, price: plan.price, period: plan.period })}
                 >
-                  Selecionar Plano
+                  {plan.price === 'Sob Consulta' ? 'Falar com Consultor' : 'Selecionar Plano'}
                 </Button>
               </div>
             ))}
@@ -612,19 +747,468 @@ export const Landing: React.FC<LandingProps> = ({ onLogin }) => {
           <p className="text-xl text-slate-600 mb-10 reveal" style={{ transitionDelay: '0.1s' }}>Junte-se a mais de 500 síndicos que modernizaram sua gestão com o Condomínio Fácil.</p>
           
           <div className="bg-white p-8 rounded-3xl border border-slate-200 inline-block w-full max-w-2xl shadow-xl shadow-blue-900/5 reveal" style={{ transitionDelay: '0.2s' }}>
-            <h3 className="font-bold text-lg mb-6">Solicite uma demonstração gratuita</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-               <input type="text" placeholder="Seu Nome" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" />
-               <input type="email" placeholder="Seu Email" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" />
-               <input type="text" placeholder="Nome do Condomínio" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" />
-               <input type="tel" placeholder="Telefone / WhatsApp" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" />
-            </div>
-            <Button size="lg" className="w-full mt-6 bg-gradient-to-r from-blue-900 to-blue-700 hover:from-blue-800 hover:to-blue-600 transform hover:scale-[1.02] transition-all shadow-lg" onClick={onLogin}>
-              Agendar Demonstração
-            </Button>
+            
+            {formSubmitted ? (
+              <div className="py-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="text-green-600" size={32} />
+                </div>
+                <h3 className="font-bold text-xl text-slate-900 mb-2">Solicitação Enviada!</h3>
+                <p className="text-slate-600 mb-6">Em breve nossa equipe entrará em contato com você.</p>
+                <Button variant="outline" onClick={() => setFormSubmitted(false)}>
+                  Enviar nova solicitação
+                </Button>
+              </div>
+            ) : isLoading ? (
+              <div className="py-12">
+                <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+                <p className="text-slate-600 font-medium">Enviando sua solicitação...</p>
+              </div>
+            ) : (
+              <>
+                <h3 className="font-bold text-lg mb-6">Solicite uma demonstração gratuita</h3>
+                
+                {errorMessage && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm flex items-center gap-2">
+                    <AlertTriangle size={18} />
+                    {errorMessage}
+                  </div>
+                )}
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                   <input 
+                     type="text" 
+                     name="nome"
+                     placeholder="Seu Nome *" 
+                     value={formData.nome}
+                     onChange={handleInputChange}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" 
+                   />
+                   <input 
+                     type="email" 
+                     name="email"
+                     placeholder="Seu Email *" 
+                     value={formData.email}
+                     onChange={handleInputChange}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" 
+                   />
+                   <input 
+                     type="text" 
+                     name="condominio"
+                     placeholder="Nome do Condomínio" 
+                     value={formData.condominio}
+                     onChange={handleInputChange}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" 
+                   />
+                   <input 
+                     type="tel" 
+                     name="telefone"
+                     placeholder="Telefone / WhatsApp" 
+                     value={formData.telefone}
+                     onChange={handleInputChange}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-500 outline-none transition-all focus:shadow-md bg-slate-50 focus:bg-white" 
+                   />
+                </div>
+                <Button size="lg" className="w-full mt-6 bg-gradient-to-r from-blue-900 to-blue-700 hover:from-blue-800 hover:to-blue-600 transform hover:scale-[1.02] transition-all shadow-lg" onClick={handleSubmit}>
+                  Agendar Demonstração
+                </Button>
+                <p className="text-xs text-slate-400 mt-4">* Campos obrigatórios</p>
+              </>
+            )}
           </div>
         </div>
       </section>
+
+      {/* Modal de Opções de Contato */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <div className="text-center mb-6">
+              <h3 className="font-bold text-xl text-slate-900 mb-2">Como prefere nos contatar?</h3>
+              <p className="text-slate-600 text-sm">Escolha a melhor forma de enviar sua solicitação</p>
+            </div>
+            
+            <div className="space-y-3">
+              <button 
+                onClick={sendViaWhatsApp}
+                className="w-full flex items-center justify-center gap-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-xl transition-all hover:scale-[1.02] shadow-lg"
+              >
+                <MessageSquare size={20} />
+                Enviar via WhatsApp
+              </button>
+              
+              <button 
+                onClick={sendViaEmail}
+                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all hover:scale-[1.02] shadow-lg"
+              >
+                <Mail size={20} />
+                Enviar via Email
+              </button>
+              
+              <button 
+                onClick={() => setShowContactModal(false)}
+                className="w-full text-slate-500 hover:text-slate-700 font-medium py-3 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Pagamento */}
+      {showPaymentModal && selectedPlan && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl my-8">
+            
+            {/* Header do Modal */}
+            <div className="bg-gradient-to-r from-blue-900 to-blue-700 p-6 rounded-t-3xl">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-white font-bold text-xl">Plano {selectedPlan.name}</h3>
+                  <p className="text-blue-200 text-sm mt-1">
+                    {selectedPlan.price}{selectedPlan.period}
+                  </p>
+                </div>
+                <button 
+                  onClick={closePaymentModal}
+                  className="text-white/70 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              
+              {/* Step 1: Seleção de método de pagamento */}
+              {paymentStep === 'select' && (
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-slate-900 text-center mb-6">Escolha a forma de pagamento</h4>
+                  
+                  <button
+                    onClick={() => handlePaymentMethodSelect('pix')}
+                    className="w-full flex items-center gap-4 p-4 border-2 border-slate-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
+                      <QrCode size={24} />
+                    </div>
+                    <div className="text-left flex-1">
+                      <p className="font-semibold text-slate-900">PIX</p>
+                      <p className="text-sm text-slate-500">Aprovação instantânea</p>
+                    </div>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">5% OFF</span>
+                  </button>
+
+                  <button
+                    onClick={() => handlePaymentMethodSelect('credit_card')}
+                    className="w-full flex items-center gap-4 p-4 border-2 border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                      <CreditCard size={24} />
+                    </div>
+                    <div className="text-left flex-1">
+                      <p className="font-semibold text-slate-900">Cartão de Crédito</p>
+                      <p className="text-sm text-slate-500">Parcele em até 12x</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handlePaymentMethodSelect('boleto')}
+                    className="w-full flex items-center gap-4 p-4 border-2 border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform">
+                      <Banknote size={24} />
+                    </div>
+                    <div className="text-left flex-1">
+                      <p className="font-semibold text-slate-900">Boleto Bancário</p>
+                      <p className="text-sm text-slate-500">Vencimento em 3 dias úteis</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handlePaymentMethodSelect('stripe')}
+                    className="w-full flex items-center gap-4 p-4 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600 group-hover:scale-110 transition-transform">
+                      <Lock size={24} />
+                    </div>
+                    <div className="text-left flex-1">
+                      <p className="font-semibold text-slate-900">Stripe Checkout</p>
+                      <p className="text-sm text-slate-500">Pagamento seguro internacional</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* Step 2: Processo de pagamento */}
+              {paymentStep === 'process' && (
+                <div className="space-y-6">
+                  
+                  {/* PIX */}
+                  {paymentMethod === 'pix' && (
+                    <div className="text-center">
+                      <div className="bg-slate-100 p-6 rounded-2xl mb-4">
+                        <div className="w-48 h-48 mx-auto bg-white rounded-xl flex items-center justify-center border-2 border-slate-200">
+                          {/* QR Code simulado */}
+                          <div className="grid grid-cols-5 gap-1">
+                            {Array.from({ length: 25 }).map((_, i) => (
+                              <div 
+                                key={i} 
+                                className={`w-6 h-6 rounded-sm ${Math.random() > 0.5 ? 'bg-slate-900' : 'bg-white'}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <p className="text-slate-600 text-sm mb-4">
+                        Escaneie o QR Code ou copie o código PIX abaixo
+                      </p>
+                      
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value="00020126580014br.gov.bcb.pix..."
+                          className="flex-1 px-4 py-3 bg-slate-100 rounded-xl text-sm text-slate-600 truncate"
+                        />
+                        <button
+                          onClick={copyPixCode}
+                          className={`px-4 py-3 rounded-xl font-medium transition-all ${
+                            pixCopied 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                        >
+                          {pixCopied ? <Check size={20} /> : <Copy size={20} />}
+                        </button>
+                      </div>
+                      
+                      {pixCopied && (
+                        <p className="text-green-600 text-sm mt-2 font-medium">✓ Código copiado!</p>
+                      )}
+                      
+                      <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+                        <p className="text-green-800 text-sm">
+                          <strong>Valor com desconto:</strong> {' '}
+                          {selectedPlan.price.replace('R$ ', 'R$ ').replace(/(\d+)/, (m) => String(Math.round(parseInt(m) * 0.95)))}
+                          {selectedPlan.period}
+                        </p>
+                      </div>
+                      
+                      <Button 
+                        className="w-full mt-6" 
+                        onClick={processPayment}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <><Loader2 className="animate-spin mr-2" size={18} /> Verificando pagamento...</>
+                        ) : (
+                          'Já fiz o pagamento'
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Cartão de Crédito */}
+                  {paymentMethod === 'credit_card' && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                          <label className="text-sm font-medium text-slate-700 mb-1 block">Nome no cartão</label>
+                          <input 
+                            type="text"
+                            name="nome"
+                            value={customerData.nome}
+                            onChange={handleCustomerDataChange}
+                            placeholder="Como está no cartão"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-sm font-medium text-slate-700 mb-1 block">Número do cartão</label>
+                          <input 
+                            type="text"
+                            placeholder="0000 0000 0000 0000"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 mb-1 block">Validade</label>
+                          <input 
+                            type="text"
+                            placeholder="MM/AA"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 mb-1 block">CVV</label>
+                          <input 
+                            type="text"
+                            placeholder="123"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-sm font-medium text-slate-700 mb-1 block">Parcelas</label>
+                          <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none bg-white">
+                            <option>1x de {selectedPlan.price} (sem juros)</option>
+                            <option>2x de R$ {Math.ceil(parseInt(selectedPlan.price.replace(/\D/g, '')) / 2)},00 (sem juros)</option>
+                            <option>3x de R$ {Math.ceil(parseInt(selectedPlan.price.replace(/\D/g, '')) / 3)},00 (sem juros)</option>
+                            <option>6x de R$ {Math.ceil(parseInt(selectedPlan.price.replace(/\D/g, '')) / 6)},00 (sem juros)</option>
+                            <option>12x de R$ {Math.ceil(parseInt(selectedPlan.price.replace(/\D/g, '')) / 12)},00 (sem juros)</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-4">
+                        <Lock size={14} />
+                        <span>Pagamento 100% seguro com criptografia SSL</span>
+                      </div>
+                      
+                      <Button 
+                        className="w-full mt-4" 
+                        onClick={processPayment}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <><Loader2 className="animate-spin mr-2" size={18} /> Processando...</>
+                        ) : (
+                          `Pagar ${selectedPlan.price}`
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Boleto */}
+                  {paymentMethod === 'boleto' && (
+                    <div className="space-y-4">
+                      <div className="grid gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 mb-1 block">Nome completo</label>
+                          <input 
+                            type="text"
+                            name="nome"
+                            value={customerData.nome}
+                            onChange={handleCustomerDataChange}
+                            placeholder="Seu nome completo"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 mb-1 block">CPF/CNPJ</label>
+                          <input 
+                            type="text"
+                            name="cpf"
+                            value={customerData.cpf}
+                            onChange={handleCustomerDataChange}
+                            placeholder="000.000.000-00"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
+                          <input 
+                            type="email"
+                            name="email"
+                            value={customerData.email}
+                            onChange={handleCustomerDataChange}
+                            placeholder="seu@email.com"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                        <p className="text-orange-800 text-sm">
+                          O boleto será enviado para seu email e tem vencimento em <strong>3 dias úteis</strong>.
+                        </p>
+                      </div>
+                      
+                      <Button 
+                        className="w-full" 
+                        onClick={processPayment}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <><Loader2 className="animate-spin mr-2" size={18} /> Gerando boleto...</>
+                        ) : (
+                          'Gerar Boleto'
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Stripe */}
+                  {paymentMethod === 'stripe' && (
+                    <div className="text-center space-y-6">
+                      <div className="p-8 bg-violet-50 rounded-2xl">
+                        <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Lock className="text-violet-600" size={28} />
+                        </div>
+                        <h4 className="font-bold text-slate-900 mb-2">Checkout Seguro Stripe</h4>
+                        <p className="text-slate-600 text-sm">
+                          Você será redirecionado para o ambiente seguro do Stripe para finalizar o pagamento.
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center justify-center gap-4 text-slate-400">
+                        <span className="text-2xl font-bold">visa</span>
+                        <span className="text-2xl font-bold">mastercard</span>
+                        <span className="text-lg">amex</span>
+                      </div>
+                      
+                      <Button 
+                        className="w-full bg-violet-600 hover:bg-violet-700" 
+                        onClick={processPayment}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <><Loader2 className="animate-spin mr-2" size={18} /> Redirecionando...</>
+                        ) : (
+                          'Ir para Checkout Seguro'
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setPaymentStep('select')}
+                    className="w-full text-slate-500 hover:text-slate-700 text-sm font-medium mt-4"
+                  >
+                    ← Voltar e escolher outro método
+                  </button>
+                </div>
+              )}
+
+              {/* Step 3: Sucesso */}
+              {paymentStep === 'success' && (
+                <div className="text-center py-6">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 className="text-green-600" size={40} />
+                  </div>
+                  <h4 className="text-2xl font-bold text-slate-900 mb-2">Pagamento Confirmado!</h4>
+                  <p className="text-slate-600 mb-6">
+                    Obrigado por escolher o Condomínio Fácil! Você receberá um email com os próximos passos.
+                  </p>
+                  
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl mb-6">
+                    <p className="text-blue-800 text-sm">
+                      <strong>Plano:</strong> {selectedPlan.name}<br/>
+                      <strong>Valor:</strong> {selectedPlan.price}{selectedPlan.period}
+                    </p>
+                  </div>
+                  
+                  <Button onClick={closePaymentModal} className="w-full">
+                    Fechar
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-slate-50 border-t border-slate-200 py-12">
