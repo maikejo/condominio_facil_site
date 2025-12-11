@@ -187,12 +187,20 @@ export const Landing: React.FC<LandingProps> = ({ onLogin }) => {
             
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#funcionalidades" className="text-sm font-medium text-slate-600 hover:text-blue-900 transition-colors">Funcionalidades</a>
-              <a href="#planos" className="text-sm font-medium text-slate-600 hover:text-blue-900 transition-colors">Planos</a>
-              <a href="#depoimentos" className="text-sm font-medium text-slate-600 hover:text-blue-900 transition-colors">Depoimentos</a>
+              {['Funcionalidades', 'Planos', 'Depoimentos'].map((item) => (
+                <a 
+                  key={item}
+                  href={`#${item.toLowerCase()}`} 
+                  className="relative group px-1 py-2"
+                >
+                  <span className="text-sm font-medium text-slate-600 group-hover:text-blue-900 transition-colors">{item}</span>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-900 transition-all duration-300 ease-out group-hover:w-full rounded-full"></span>
+                </a>
+              ))}
+              
               <div className="flex items-center gap-3 ml-4">
-                <Button variant="ghost" onClick={onLogin}>Área do Cliente</Button>
-                <Button onClick={onLogin} size="sm" className="shadow-blue-500/30">Experimente Grátis</Button>
+                <Button variant="ghost" onClick={onLogin} className="hover:bg-blue-50 hover:text-blue-900 hover:-translate-y-0.5 transition-all">Área do Cliente</Button>
+                <Button onClick={onLogin} size="sm" className="shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105 transition-all duration-300">Experimente Grátis</Button>
               </div>
             </div>
 
@@ -207,9 +215,9 @@ export const Landing: React.FC<LandingProps> = ({ onLogin }) => {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-t border-slate-100 absolute w-full animate-fade-in">
             <div className="px-4 pt-2 pb-6 space-y-2">
-              <a href="#funcionalidades" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2 text-base font-medium text-slate-700">Funcionalidades</a>
-              <a href="#planos" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2 text-base font-medium text-slate-700">Planos</a>
-              <a href="#depoimentos" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2 text-base font-medium text-slate-700">Depoimentos</a>
+              <a href="#funcionalidades" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2 text-base font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-900 rounded-lg transition-colors">Funcionalidades</a>
+              <a href="#planos" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2 text-base font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-900 rounded-lg transition-colors">Planos</a>
+              <a href="#depoimentos" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2 text-base font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-900 rounded-lg transition-colors">Depoimentos</a>
               <hr className="border-slate-100 my-2"/>
               <Button className="w-full justify-center" onClick={onLogin}>Acessar Sistema</Button>
             </div>
